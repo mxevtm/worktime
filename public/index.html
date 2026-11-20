@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Worktime</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --fg:#1b1f24; --muted:#667085; --line:#e4e7ec; --accent:#2563eb; --good:#16a34a; --bad:#dc2626; --warn:#d97706; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f1216; --card:#181c22; --fg:#e8eaed; --muted:#98a2b3; --line:#2a3039; --accent:#5b8def; --good:#4ade80; --bad:#f87171; --warn:#fbbf24; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width:760px; margin:0 auto; padding:16px; }
+  header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  h1 { font-size:18px; margin:0; } h2 { font-size:14px; margin:0 0 10px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:12px; }
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .stat .v { font-size:22px; font-weight:650; font-variant-numeric:tabular-nums; } .stat .l { color:var(--muted); font-size:12px; }
+  .clock { font-size:44px; font-weight:650; font-variant-numeric:tabular-nums; text-align:center; margin:4px 0; }
+  .status { text-align:center; color:var(--muted); margin-bottom:10px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .row > * { flex:1; min-width:110px; }
+  input, select, button { font:inherit; padding:9px 11px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--fg); }
+  button { cursor:pointer; background:var(--accent); color:#fff; border-color:transparent; font-weight:600; }
+  button.sec { background:transparent; color:var(--fg); border-color:var(--line); }
+  button.warn { background:var(--warn); color:#000; } button.bad { background:var(--bad); }
+  button.small { padding:4px 8px; font-size:12px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:8px 0 3px; }
+  table { width:100%; border-collapse:collapse; } td, th { padding:7px 4px; border-bottom:1px solid var(--line); text-align:left; font-variant-numeric:tabular-nums; }
+  th { color:var(--muted); font-size:12px; font-weight:600; } td.r, th.r { text-align:right; }
+  .pos { color:var(--good); } .neg { color:var(--bad); }
+  .err { color:var(--bad); min-height:1.2em; margin-top:8px; }
+  .hidden { display:none; } .muted { color:var(--muted); font-size:13px; } code { word-break:break-all; font-size:12px; }
+  .days label { display:inline-flex; gap:4px; align-items:center; margin:0 10px 0 0; font-size:13px; color:var(--fg); } .days input { padding:0; }
+  details summary { cursor:pointer; font-weight:600; }
+  @media (max-width:520px) { .grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<main>
+
+<!-- AUTH -->
+<section id="auth" class="card hidden" style="max-width:380px;margin:60px auto">
+  <h1 id="authTitle">Sign in</h1>
+  <div id="nameWrap" class="hidden"><label>Name</label><input id="name" autocomplete="name"></div>
+  <label>Email</label><input id="email" type="email" autocomplete="email">
+  <label>Password</label><input id="password" type="password" autocomplete="current-password">
+  <div class="err" id="authErr"></div>
+  <div class="row" style="margin-top:8px"><button id="authBtn">Sign in</button><button id="authToggle" class="sec">Create account</button></div>
+</section>
+
+<!-- APP -->
+<section id="app" class="hidden">
+  <header><h1>⏱ Worktime</h1><div><span id="who" class="muted"></span> <button id="logout" class="sec small">Sign out</button></div></header>
+
+  <div class="card">
+    <div class="clock" id="clock">0:00:00</div>
+    <div class="status" id="status">Not running</div>
+    <input id="note" placeholder="What are you working on? (optional)" style="width:100%;margin-bottom:8px">
+    <div class="row" id="timerBtns"></div>
+    <div class="muted" id="breakInfo" style="text-align:center;margin-top:8px"></div>
+  </div>
+
+  <div class="grid">
+    <div class="card stat"><div class="v" id="sToday">–</div><div class="l">Today (worked / target)</div></div>
+    <div class="card stat"><div class="v" id="sWeek">–</div><div class="l">This week (worked / target)</div></div>
+    <div class="card stat"><div class="v" id="sBal">–</div><div class="l">Overtime balance</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Recent entries</h2>
+    <table><thead><tr><th>Date</th><th>Time</th><th class="r">Break</th><th class="r">Net</th><th></th></tr></thead><tbody id="entries"></tbody></table>
+  </div>
+
+  <div class="card">
+    <details><summary>Add entry manually</summary>
+      <div class="row"><div><label>Start</label><input id="mStart" type="datetime-local"></div><div><label>End</label><input id="mEnd" type="datetime-local"></div><div><label>Break (min)</label><input id="mBreak" type="number" min="0" value="0"></div></div>
+      <label>Note</label><input id="mNote" style="width:100%">
+      <div class="err" id="mErr"></div><button id="mAdd">Add entry</button>
+      <div class="muted" style="margin-top:6px">Times are interpreted in your browser's time zone.</div>
+    </details>
+  </div>
+
+  <div class="card">
+    <details><summary>Settings &amp; calendar</summary>
+      <div class="row"><div><label>Weekly target hours</label><input id="setHours" type="number" step="0.25" min="0" max="80"></div>
+      <div><label>Time zone</label><input id="setTz" placeholder="Europe/Berlin"></div></div>
+      <label>Working days</label><div class="days" id="setDays"></div>
+      <div class="row"><div><label>Count balance from</label><input id="setStart" type="date"></div>
+      <div><label>Opening balance (minutes, ± )</label><input id="setInit" type="number" step="1"></div></div>
+      <div class="err" id="setErr"></div><button id="setSave">Save settings</button>
+      <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+      <label>Calendar subscription URL (anyone with this link can see your work times)</label>
+      <code id="calUrl"></code>
+      <div class="row" style="margin-top:8px"><button id="calCopy" class="sec">Copy link</button><button id="calNew" class="sec">Generate new link</button></div>
+    </details>
+  </div>
+</section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+let me = null, timer = { running: false }, fetchedAt = 0, tick = null, registerMode = false;
+
+async function api(path, method = 'GET', body) {
+  const r = await fetch('/api' + path, { method, headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401 && path !== '/login') { showAuth(); throw new Error('auth'); }
+  if (!r.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+const pad = (n) => String(n).padStart(2, '0');
+const hms = (s) => `${Math.floor(s / 3600)}:${pad(Math.floor(s % 3600 / 60))}:${pad(s % 60)}`;
+const hm = (min) => { const a = Math.abs(Math.round(min)); return `${min < 0 ? '−' : ''}${Math.floor(a / 60)}:${pad(a % 60)}`; };
+const sgn = (min) => `${min > 0 ? '+' : ''}${hm(min)}`;
+const fmtTime = (s) => new Intl.DateTimeFormat([], { timeZone: me.tz, hour: '2-digit', minute: '2-digit' }).format(new Date(s * 1000));
+const fmtDate = (s) => new Intl.DateTimeFormat([], { timeZone: me.tz, weekday: 'short', day: '2-digit', month: '2-digit' }).format(new Date(s * 1000));
+
+// ---------- auth ----------
+function showAuth() { $('app').classList.add('hidden'); $('auth').classList.remove('hidden'); clearInterval(tick); }
+function setMode(reg) {
+  registerMode = reg;
+  $('authTitle').textContent = reg ? 'Create account' : 'Sign in';
+  $('authBtn').textContent = reg ? 'Create account' : 'Sign in';
+  $('authToggle').textContent = reg ? 'I have an account' : 'Create account';
+  $('nameWrap').classList.toggle('hidden', !reg);
+  $('password').autocomplete = reg ? 'new-password' : 'current-password';
+}
+$('authToggle').onclick = () => setMode(!registerMode);
+$('authBtn').onclick = async () => {
+  $('authErr').textContent = '';
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    await api(registerMode ? '/register' : '/login', 'POST',
+      { email: $('email').value, password: $('password').value, name: $('name').value, tz });
+    $('password').value = ''; await boot();
+  } catch (e) { $('authErr').textContent = e.message; }
+};
+$('password').onkeydown = (e) => { if (e.key === 'Enter') $('authBtn').click(); };
+$('logout').onclick = async () => { await api('/logout', 'POST'); me = null; showAuth(); };
+
+// ---------- timer ----------
+function renderTimer() {
+  const t = timer, b = $('timerBtns');
+  b.innerHTML = '';
+  const add = (label, cls, fn) => { const x = document.createElement('button'); x.textContent = label; x.className = cls; x.onclick = fn; b.append(x); };
+  const act = (p) => async () => { try { timer = await api('/timer/' + p, 'POST', { note: $('note').value }); fetchedAt = Date.now(); if (p === 'stop') { $('note').value = ''; } renderTimer(); loadAll(); } catch (e) { alert(e.message); } };
+  if (!t.running) { add('Start work', '', act('start')); $('status').textContent = 'Not running'; $('breakInfo').textContent = ''; }
+  else if (t.on_break) { add('Resume', '', act('resume')); add('Stop', 'bad', act('stop')); $('status').textContent = 'On break'; }
+  else { add('Pause (break)', 'warn', act('pause')); add('Stop', 'bad', act('stop')); $('status').textContent = 'Working'; }
+  if (t.running && !$('note').value) $('note').value = t.entry.note || '';
+  drawClock();
+}
+function drawClock() {
+  const t = timer;
+  if (!t.running) { $('clock').textContent = '0:00:00'; return; }
+  const el = Math.floor((Date.now() - fetchedAt) / 1000);
+  $('clock').textContent = hms(t.net_s + (t.on_break ? 0 : el));
+  $('breakInfo').textContent = 'Breaks so far: ' + Math.floor((t.break_s + (t.on_break ? el : 0)) / 60) + ' min';
+}
+
+// ---------- data ----------
+function monday(ymd) { const d = new Date(ymd + 'T00:00:00Z'); const w = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - w); return d.toISOString().slice(0, 10); }
+async function loadAll() {
+  const [sum, rows] = await Promise.all([api('/summary'), api('/entries')]);
+  const today = sum.days[sum.days.length - 1] || { worked_min: 0, target_min: 0 };
+  const wk = sum.days.filter((d) => d.date >= monday(sum.today));
+  const w = wk.reduce((a, d) => a + d.worked_min, 0), wt = wk.reduce((a, d) => a + d.target_min, 0);
+  // live part of a running timer is already included by the server at request time
+  $('sToday').textContent = `${hm(today.worked_min)} / ${hm(today.target_min)}`;
+  $('sWeek').textContent = `${hm(w)} / ${hm(wt)}`;
+  $('sBal').textContent = sgn(sum.balance_min) + ' h'; $('sBal').className = 'v ' + (sum.balance_min >= 0 ? 'pos' : 'neg');
+  const tb = $('entries'); tb.innerHTML = '';
+  for (const e of rows) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${fmtDate(e.start_s)}</td><td>${fmtTime(e.start_s)}–${e.end_s ? fmtTime(e.end_s) : '…'}${e.note ? `<div class="muted"></div>` : ''}</td><td class="r">${Math.round(e.break_s / 60)}m</td><td class="r">${hm(Math.round(e.net_s / 60))}</td><td class="r"></td>`;
+    if (e.note) tr.querySelector('.muted').textContent = e.note;
+    if (e.end_s) { const x = document.createElement('button'); x.className = 'sec small'; x.textContent = 'Delete'; x.onclick = async () => { if (confirm('Delete this entry?')) { await api('/entries/' + e.id, 'DELETE'); loadAll(); } }; tr.lastElementChild.append(x); }
+    tb.append(tr);
+  }
+  if (!rows.length) tb.innerHTML = '<tr><td colspan="5" class="muted">No entries yet.</td></tr>';
+}
+$('mAdd').onclick = async () => {
+  $('mErr').textContent = '';
+  try {
+    await api('/entries', 'POST', { start_s: Math.floor(new Date($('mStart').value) / 1000), end_s: Math.floor(new Date($('mEnd').value) / 1000), break_min: $('mBreak').value || 0, note: $('mNote').value });
+    $('mNote').value = ''; loadAll();
+  } catch (e) { $('mErr').textContent = e.message; }
+};
+
+// ---------- settings ----------
+function renderSettings() {
+  $('setHours').value = me.weekly_hours; $('setTz').value = me.tz; $('setStart').value = me.start_date; $('setInit').value = me.initial_balance_min;
+  $('setDays').innerHTML = [1, 2, 3, 4, 5, 6, 0].map((d) => `<label><input type="checkbox" value="${d}" ${me.work_days.includes(d) ? 'checked' : ''}>${DAYS[d]}</label>`).join('');
+  $('calUrl').textContent = `${location.origin}/cal/${me.cal_token}.ics`;
+  $('who').textContent = me.name;
+}
+$('setSave').onclick = async () => {
+  $('setErr').textContent = '';
+  try {
+    me = await api('/me', 'PATCH', { weekly_hours: $('setHours').value, tz: $('setTz').value, start_date: $('setStart').value,
+      initial_balance_min: $('setInit').value, work_days: [...document.querySelectorAll('#setDays input:checked')].map((c) => c.value) });
+    renderSettings(); loadAll();
+  } catch (e) { $('setErr').textContent = e.message; }
+};
+$('calCopy').onclick = () => navigator.clipboard.writeText($('calUrl').textContent);
+$('calNew').onclick = async () => { if (confirm('The old link will stop working. Continue?')) { me.cal_token = (await api('/me/cal-token', 'POST')).cal_token; renderSettings(); } };
+
+// ---------- boot ----------
+async function boot() {
+  try { me = await api('/me'); } catch { return showAuth(); }
+  $('auth').classList.add('hidden'); $('app').classList.remove('hidden');
+  renderSettings();
+  timer = await api('/timer'); fetchedAt = Date.now(); renderTimer();
+  clearInterval(tick); tick = setInterval(drawClock, 1000);
+  loadAll();
+}
+boot();
+</script>
+</body>
+</html>
