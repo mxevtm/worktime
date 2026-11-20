@@ -9,7 +9,7 @@ run_worker_first = ["/api/*", "/cal/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "worktime"
-database_id = "REPLACE_WITH_YOUR_D1_ID"
+database_id = "09b1741b-31d5-4d22-b420-1e793d39a6e8"
 
 [vars]
 # Set to "false" after you have created your accounts
